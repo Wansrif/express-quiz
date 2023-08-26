@@ -48,8 +48,11 @@ const quizController = {
       const correctOption = redisQuiz.correctOption;
       const quizId = await redis.get(`${req.user.username}-quizId`);
       const round = await redis.get(`${req.user.username}-round`);
+      const questionId = await redis.get(`${req.user.username}-questionId`);
+      const countQuestion = JSON.parse(questionId)?.length;
 
       const quiz = await Quiz.findOne({ _id: quizId });
+      const roundScore = await quiz.score[`round-${round}`];
 
       if (answer.toLowerCase() !== correctOption.toLowerCase()) {
         // if user answer wrong, decrease score -5
@@ -62,7 +65,12 @@ const quizController = {
           status: 'success',
           status_code: 200,
           message: 'Wrong answer',
-          correctOption,
+          data: {
+            round,
+            score: roundScore,
+            quiz: `${countQuestion}/15`,
+            correctOption,
+          },
         });
       }
 
@@ -94,6 +102,11 @@ const quizController = {
         status: 'success',
         status_code: 200,
         message: 'Correct answer',
+        data: {
+          round,
+          score: roundScore,
+          quiz: `${countQuestion}/15`,
+        },
       });
     } catch (error) {
       return res.status(500).json({ message: error.message });
