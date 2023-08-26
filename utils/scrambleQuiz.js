@@ -42,51 +42,8 @@ export const generateQuiz = async (userId) => {
   const onGoingQuiz = await redis.get(`${user.username}-quiz`);
   const questionId = await redis.get(`${user.username}-questionId`);
 
-  /* if round is 1, generate quiz by last number phone */
-  if (!round || (round === 1 && !onGoingQuiz)) {
-    const lastNumber = parseInt(phone.slice(-1));
-    const bucket = bucketQuiz[lastNumber];
-    const random = Math.floor(Math.random() * bucket.length);
-
-    const quiz = soal.quiz.find((q) => q.id === bucket[random]);
-    /* quiz cant be same as before */
-    if (questionId) {
-      const filterBucket = removeDuplicate(JSON.parse(questionId), bucket);
-
-      if (filterBucket.length === 0) {
-        await redis.set(`${user.username}-round`, 2);
-        return await redis.del(`${user.username}-questionId`);
-      }
-
-      const random = Math.floor(Math.random() * filterBucket.length);
-      const quizFilter = soal.quiz.find((q) => q.id === filterBucket[random]);
-
-      const quizId = await redis.get(`${user.username}-quizId`);
-      const findQuestionId = await Quiz.findOne({ _id: quizId }).select('questionId');
-      const arr = [...Object.values(findQuestionId.questionId[`round-1`]), quizFilter.id];
-      await Quiz.updateOne({ _id: quizId }, { $set: { [`questionId.round-${round}`]: arr } });
-
-      await redis.set(`${user.username}-round`, 1);
-      await redis.set(`${user.username}-questionId`, JSON.stringify(arr));
-      await redis.set(`${user.username}-quiz`, JSON.stringify(quizFilter));
-      return quizFilter;
-    }
-
-    const quizId = await Quiz.create({
-      questionId: { [`round-${1}`]: [quiz.id] },
-      score: { [`round-${1}`]: 0 },
-    });
-
-    await redis.set(`${user.username}-round`, 1);
-    await redis.set(`${user.username}-quiz`, JSON.stringify(quiz));
-    await redis.set(`${user.username}-quizId`, quizId._id);
-    await redis.set(`${user.username}-questionId`, JSON.stringify([quiz.id]));
-
-    return quiz;
-  }
-
   /* if round not 1 */
-  if (round && round !== 1) {
+  if (round && parseInt(round) !== 1) {
     const getIndexBucket = (round + 1) % 10;
     const bucket = bucketQuiz[getIndexBucket];
     const random = Math.floor(Math.random() * bucket.length);
@@ -128,6 +85,49 @@ export const generateQuiz = async (userId) => {
 
     await redis.set(`${user.username}-round`, round);
     await redis.set(`${user.username}-quiz`, JSON.stringify(quiz));
+    await redis.set(`${user.username}-questionId`, JSON.stringify([quiz.id]));
+
+    return quiz;
+  }
+
+  /* if round is 1, generate quiz by last number phone */
+  if (!round || !onGoingQuiz || parseInt(round) === 1) {
+    const lastNumber = parseInt(phone.slice(-1));
+    const bucket = bucketQuiz[lastNumber];
+    const random = Math.floor(Math.random() * bucket.length);
+
+    const quiz = soal.quiz.find((q) => q.id === bucket[random]);
+    /* quiz cant be same as before */
+    if (questionId) {
+      const filterBucket = removeDuplicate(JSON.parse(questionId), bucket);
+
+      if (filterBucket.length === 0) {
+        await redis.set(`${user.username}-round`, 2);
+        return await redis.del(`${user.username}-questionId`);
+      }
+
+      const random = Math.floor(Math.random() * filterBucket.length);
+      const quizFilter = soal.quiz.find((q) => q.id === filterBucket[random]);
+
+      const quizId = await redis.get(`${user.username}-quizId`);
+      const findQuestionId = await Quiz.findOne({ _id: quizId }).select('questionId');
+      const arr = [...Object.values(findQuestionId.questionId[`round-1`]), quizFilter.id];
+      await Quiz.updateOne({ _id: quizId }, { $set: { [`questionId.round-${round}`]: arr } });
+
+      await redis.set(`${user.username}-round`, 1);
+      await redis.set(`${user.username}-questionId`, JSON.stringify(arr));
+      await redis.set(`${user.username}-quiz`, JSON.stringify(quizFilter));
+      return quizFilter;
+    }
+
+    const quizId = await Quiz.create({
+      questionId: { [`round-${1}`]: [quiz.id] },
+      score: { [`round-${1}`]: 0 },
+    });
+
+    await redis.set(`${user.username}-round`, 1);
+    await redis.set(`${user.username}-quiz`, JSON.stringify(quiz));
+    await redis.set(`${user.username}-quizId`, quizId._id);
     await redis.set(`${user.username}-questionId`, JSON.stringify([quiz.id]));
 
     return quiz;
