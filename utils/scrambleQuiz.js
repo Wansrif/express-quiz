@@ -7,8 +7,7 @@ const redis = new Redis();
 
 const loadSoal = () => {
   const data = fs.readFileSync('./database/soal.json');
-  const soal = JSON.parse(data);
-  return soal;
+  return JSON.parse(data);
 };
 
 /* Bucket Quiz */
